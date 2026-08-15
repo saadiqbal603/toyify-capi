@@ -30,7 +30,7 @@ export default async function handler(request) {
   const valid = await verifyShopifyHmac(
     raw,
     request.headers.get('x-shopify-hmac-sha256'),
-    process.env.SHOPIFY_CLIENT_SECRET
+    process.env.SHOPIFY_WEBHOOK_SECRET
   );
   if (!valid) return json({ error: 'bad hmac' }, 401);
 
