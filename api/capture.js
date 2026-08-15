@@ -11,7 +11,7 @@ import { shopifyBase, shopifyHeaders, json } from '../lib/util.js';
 export const config = { runtime: 'edge' };
 
 const CORS = {
-  'Access-Control-Allow-Origin': 'https://toyify.pk',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
