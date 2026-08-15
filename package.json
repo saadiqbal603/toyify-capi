@@ -1,0 +1,7 @@
+{
+  "name": "toyify-capi",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shopify confirm-tag -> Meta CAPI VerifiedPurchase, plus fbp/fbc capture"
+}
