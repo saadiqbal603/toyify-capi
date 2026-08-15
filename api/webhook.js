@@ -37,18 +37,29 @@ export default async function handler(request) {
   const order = JSON.parse(raw);
   const tags = tagList(order);
 
+  console.log('WEBHOOK', JSON.stringify({
+    order: order.name,
+    id: order.id,
+    tags,
+    cancelled_at: order.cancelled_at,
+  }));
+
   // Gate 1 — confirmed?
   if (!tags.some((t) => CONFIRM_TAGS.includes(t))) {
-    return json({ skipped: 'not confirmed' });
+    console.log('SKIP: not confirmed', order.name, tags);
+    return json({ skipped: 'not confirmed', tags });
   }
-  // Gate 2 — already sent? orders/updated fires on every edit.
+  // Gate 2 — already sent?
   if (tags.includes(SENT_TAG)) {
+    console.log('SKIP: already sent', order.name);
     return json({ skipped: 'already sent' });
   }
-  // Gate 3 — never report a cancelled order as a purchase.
+  // Gate 3 — cancelled?
   if (order.cancelled_at) {
+    console.log('SKIP: cancelled', order.name);
     return json({ skipped: 'cancelled' });
   }
+  console.log('PASSED GATES', order.name);
 
   const ship = order.shipping_address || order.billing_address || {};
   const phone = normalisePhone(
