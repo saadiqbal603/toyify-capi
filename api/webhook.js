@@ -108,8 +108,9 @@ export default async function handler(request) {
       },
     ],
   };
-  if (process.env.META_TEST_EVENT_CODE) {
-    payload.test_event_code = process.env.META_TEST_EVENT_CODE;
+  if (process.env.DRY_RUN) {
+  console.log('DRY RUN payload', JSON.stringify(payload));
+  return json({ dry_run: true });
   }
 
   const metaRes = await fetch(
