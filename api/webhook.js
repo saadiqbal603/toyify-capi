@@ -27,6 +27,21 @@ export const config = { runtime: 'edge' };
 const CONFIRM_TAGS = ['confirmed', 'confirm', 'confrim']; // typo tolerated
 const SENT_TAG = 'capi-sent';
 
+// NEW: mirrors Purchase's customer_segmentation values. Only sent when Shopify
+// includes the customer's order count; otherwise omitted (wrong > missing).
+function segmentation(order) {
+  const count = order.customer && order.customer.orders_count;
+  if (typeof count !== 'number') {
+    console.log('NO orders_count — customer_segmentation omitted', order.name);
+    return {};
+  }
+  return {
+    customer_segmentation: [
+      count <= 1 ? 'new_customer_to_business' : 'existing_customer_to_business',
+    ],
+  };
+}
+
 export default async function handler(request) {
   if (request.method !== 'POST') return json({ error: 'method' }, 405);
 
@@ -132,8 +147,8 @@ export default async function handler(request) {
           currency: order.currency || 'PKR',
           // CHECK in Test events: if Purchase excludes shipping, use subtotal_price.
           value: Number(order.total_price || 0),
-          // CHECK in Test events: match Purchase's order_id format.
-          order_id: String(order.order_number || order.id),
+          // FIXED: Purchase sends Shopify's internal order.id, not order_number.
+          order_id: String(order.id),
           content_type: 'product',                                   // NEW
           content_ids: [...new Set(items.map(idOf))],                // NEW
           contents: items.map((li) => ({
@@ -142,7 +157,7 @@ export default async function handler(request) {
             item_price: Number(li.price),
           })),
           num_items: items.reduce((s, li) => s + (li.quantity || 0), 0), // NEW
-          // customer_segmentation: add once Purchase's exact values are known.
+          ...segmentation(order), // NEW: same values as Purchase
         },
       },
     ],
