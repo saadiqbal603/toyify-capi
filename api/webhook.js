@@ -27,14 +27,46 @@ export const config = { runtime: 'edge' };
 const CONFIRM_TAGS = ['confirmed', 'confirm', 'confrim']; // typo tolerated
 const SENT_TAG = 'capi-sent';
 
-// NEW: mirrors Purchase's customer_segmentation values. Only sent when Shopify
-// includes the customer's order count; otherwise omitted (wrong > missing).
-function segmentation(order) {
-  const count = order.customer && order.customer.orders_count;
+// NEW: mirrors Purchase's customer_segmentation values.
+// Shopify's order webhook no longer carries customer.orders_count, so fall back
+// to one Admin GraphQL lookup (needs the read_customers scope).
+// Never blocks the event: on any failure the parameter is simply omitted.
+async function segmentation(order) {
+  let count = order.customer && order.customer.orders_count;
+
   if (typeof count !== 'number') {
-    console.log('NO orders_count — customer_segmentation omitted', order.name);
+    const gid = order.customer && order.customer.admin_graphql_api_id;
+    if (!gid) {
+      console.log('NO customer on order — customer_segmentation omitted', order.name);
+      return {};
+    }
+    try {
+      const res = await fetch(`${shopifyBase()}/graphql.json`, {
+        method: 'POST',
+        headers: await shopifyHeaders(),
+        body: JSON.stringify({
+          query: 'query($id: ID!) { customer(id: $id) { numberOfOrders } }',
+          variables: { id: gid },
+        }),
+      });
+      const body = await res.json();
+      if (body.errors) {
+        console.error('SEGMENTATION lookup errors', order.name, JSON.stringify(body.errors));
+        return {};
+      }
+      const n = body.data && body.data.customer && body.data.customer.numberOfOrders;
+      count = Number(n);
+    } catch (e) {
+      console.error('SEGMENTATION lookup failed', order.name, String(e));
+      return {};
+    }
+  }
+
+  if (!Number.isFinite(count)) {
+    console.log('NO order count — customer_segmentation omitted', order.name);
     return {};
   }
+  // numberOfOrders includes this order, so 1 = first ever order.
   return {
     customer_segmentation: [
       count <= 1 ? 'new_customer_to_business' : 'existing_customer_to_business',
@@ -157,7 +189,7 @@ export default async function handler(request) {
             item_price: Number(li.price),
           })),
           num_items: items.reduce((s, li) => s + (li.quantity || 0), 0), // NEW
-          ...segmentation(order), // NEW: same values as Purchase
+          ...(await segmentation(order)), // NEW: same values as Purchase
         },
       },
     ],
